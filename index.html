@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FX Signal Analyzer</title>
+<style>
+  :root {
+    --bg: #0a0c14;
+    --panel: #0f1220;
+    --border: #1e2440;
+    --accent: #6c63ff;
+    --bull: #00e5ff;
+    --bear: #ff2d78;
+    --mid: #ffffff;
+    --upper: #ff4444;
+    --lower: #44ff88;
+    --gold: #ffd700;
+    --aqua: #00ffff;
+    --text: #c8d0e8;
+    --muted: #4a5280;
+    --buy-signal: #00ff99;
+    --sell-signal: #ff6600;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo { color: var(--accent); font-weight: 700; font-size: 15px; letter-spacing: 1px; }
+  .logo span { color: var(--gold); }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--buy-signal);
+    box-shadow: 0 0 6px var(--buy-signal);
+    animation: pulse 1.4s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+  .status-text { color: var(--muted); font-size: 11px; }
+
+  /* PAIR SELECTOR */
+  .pair-bar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .pair-bar::-webkit-scrollbar { display: none; }
+  .pair-btn {
+    flex-shrink: 0;
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .5px;
+  }
+  .pair-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(108,99,255,.4);
+  }
+
+  /* TIMEFRAME */
+  .tf-bar {
+    display: flex;
+    gap: 6px;
+    padding: 6px 14px;
+    background: #0d0f1c;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tf-bar::-webkit-scrollbar { display: none; }
+  .tf-btn {
+    flex-shrink: 0;
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .tf-btn.active {
+    background: rgba(108,99,255,.2);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* PRICE TICKER */
+  .price-ticker {
+    padding: 10px 14px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .price-main { font-size: 28px; font-weight: 700; color: #fff; letter-spacing: -1px; }
+  .price-change { font-size: 12px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .price-change.up { background: rgba(0,229,255,.15); color: var(--bull); }
+  .price-change.down { background: rgba(255,45,120,.15); color: var(--bear); }
+  .price-label { font-size: 11px; color: var(--muted); }
+  .spread-info { margin-left: auto; font-size: 11px; color: var(--muted); }
+
+  /* SIGNAL BADGE */
+  .signal-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .5px;
+  }
+  .signal-banner.buy { background: rgba(0,255,153,.08); border-left: 3px solid var(--buy-signal); color: var(--buy-signal); }
+  .signal-banner.sell { background: rgba(255,102,0,.08); border-left: 3px solid var(--sell-signal); color: var(--sell-signal); }
+  .signal-banner.neutral { background: rgba(255,215,0,.05); border-left: 3px solid var(--gold); color: var(--gold); }
+  .signal-icon { font-size: 16px; }
+
+  /* CHARTS AREA */
+  .charts-wrap { padding: 10px 8px; display: flex; flex-direction: column; gap: 6px; }
+
+  .chart-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .chart-label {
+    padding: 6px 12px;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: .5px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+  }
+  .chart-label span { color: var(--text); }
+  canvas { width: 100% !important; display: block; }
+
+  /* SETTINGS PANEL */
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+  .setting-item {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .setting-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+  .setting-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 8px;
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+  }
+  .setting-input:focus { border-color: var(--accent); }
+
+  .full-width { grid-column: 1 / -1; }
+
+  .refresh-btn {
+    width: 100%;
+    padding: 11px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: .5px;
+    transition: all .2s;
+  }
+  .refresh-btn:hover { background: #5a52e0; }
+  .refresh-btn:active { transform: scale(.98); }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 14px;
+    font-size: 10px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; color: var(--muted); }
+  .legend-dot { width: 10px; height: 3px; border-radius: 2px; }
+
+  /* STATS ROW */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 8px 14px;
+  }
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    text-align: center;
+  }
+  .stat-val { font-size: 16px; font-weight: 700; }
+  .stat-lbl { font-size: 9px; color: var(--muted); margin-top: 2px; }
+
+  .loading-overlay {
+    position: fixed; inset: 0;
+    background: rgba(10,12,20,.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-msg {
+    padding: 10px 14px;
+    background: rgba(255,45,120,.1);
+    border-left: 3px solid var(--bear);
+    color: var(--bear);
+    font-size: 12px;
+    margin: 8px 14px;
+    border-radius: 0 6px 6px 0;
+    display: none;
+  }
+
+  /* Histogram in main chart background fill */
+  .section-title {
+    padding: 4px 14px 0;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .auto-badge {
+    font-size: 9px;
+    background: rgba(108,99,255,.2);
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+
+  footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 10px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div>Memuat data pasar...</div>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">FX<span>Signal</span></div>
+    <div class="live-dot"></div>
+    <div class="status-text" id="lastUpdate">--:--</div>
+  </div>
+  <div style="font-size:10px;color:var(--muted);" id="apiStatus">Twelve Data API</div>
+</div>
+
+<!-- PAIR SELECTOR -->
+<div class="pair-bar">
+  <button class="pair-btn active" onclick="selectPair('GBP/USD',this)">GBP/USD</button>
+  <button class="pair-btn" onclick="selectPair('EUR/USD',this)">EUR/USD</button>
+</div>
+
+<!-- TIMEFRAME -->
+<div class="tf-bar">
+  <button class="tf-btn" onclick="selectTF('1min',this)">M1</button>
+  <button class="tf-btn" onclick="selectTF('5min',this)">M5</button>
+  <button class="tf-btn active" onclick="selectTF('15min',this)">M15</button>
+  <button class="tf-btn" onclick="selectTF('30min',this)">M30</button>
+  <button class="tf-btn" onclick="selectTF('1h',this)">H1</button>
+  <button class="tf-btn" onclick="selectTF('4h',this)">H4</button>
+  <button class="tf-btn" onclick="selectTF('1day',this)">D1</button>
+</div>
+
+<!-- PRICE TICKER -->
+<div class="price-ticker">
+  <div>
+    <div class="price-label" id="pairLabel">GBP/USD</div>
+    <div class="price-main" id="priceDisplay">-.----</div>
+  </div>
+  <div class="price-change neutral" id="priceChange">+0.0000</div>
+  <div class="spread-info" id="spreadInfo">H: ------ | L: ------</div>
+</div>
+
+<!-- SIGNAL BANNER -->
+<div class="signal-banner neutral" id="signalBanner">
+  <span class="signal-icon">⏳</span>
+  <span id="signalText">Memuat sinyal...</span>
+  <span class="auto-badge">AUTO</span>
+</div>
+
+<div class="error-msg" id="errorMsg"></div>
+
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-val" id="statVBox" style="color:var(--bull)">--</div>
+    <div class="stat-lbl">VBox Val</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" id="statEnvU" style="color:var(--upper)">--</div>
+    <div class="stat-lbl">Env Upper</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" id="statEnvL" style="color:var(--lower)">--</div>
+    <div class="stat-lbl">Env Lower</div>
+  </div>
+</div>
+
+<!-- MAIN CHART -->
+<div class="section-title">CHART UTAMA</div>
+<div class="charts-wrap">
+  <div class="chart-card">
+    <div class="chart-label">
+      Candlestick + Histogram Background + Envelopes 3 Garis
+      <span id="mainChartInfo">Period: 14 | Dev: 0.10%</span>
+    </div>
+    <canvas id="mainChart" height="280"></canvas>
+  </div>
+
+  <!-- LEGEND main -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#fff"></div> MA Middle</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--upper)"></div> Upper Band</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--lower)"></div> Lower Band</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(200,100,255,.6);height:10px;border-radius:2px"></div> Histogram BG</div>
+  </div>
+
+  <!-- SUB WINDOW -->
+  <div class="section-title" style="padding-top:4px">SUB-WINDOW — VBox Histogram + Envelopes</div>
+  <div class="chart-card">
+    <div class="chart-label">
+      VBox Oscillator [0–100] + Envelope Bands
+      <span id="subChartInfo">Look: 14 | Env: 14/20%</span>
+    </div>
+    <canvas id="subChart" height="180"></canvas>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--bull);height:8px;border-radius:2px"></div> Bull Bar</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--bear);height:8px;border-radius:2px"></div> Bear Bar</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--lower);border-top:1px dashed var(--lower)"></div> Env Upper</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--upper);border-top:1px dashed var(--upper)"></div> Env Lower</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--gold)"></div> Level 85</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--aqua)"></div> Level 15</div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="section-title">PENGATURAN INDIKATOR</div>
+<div class="settings-grid">
+  <div class="setting-item">
+    <div class="setting-label">ENV Period (MA)</div>
+    <input class="setting-input" id="envPeriod" type="number" value="14" min="2" max="200">
+  </div>
+  <div class="setting-item">
+    <div class="setting-label">ENV Deviation (%)</div>
+    <input class="setting-input" id="envDev" type="number" value="0.10" min="0.01" step="0.01">
+  </div>
+  <div class="setting-item">
+    <div class="setting-label">VBox Lookback</div>
+    <input class="setting-input" id="vboxLook" type="number" value="14" min="2" max="100">
+  </div>
+  <div class="setting-item">
+    <div class="setting-label">VBox Smooth</div>
+    <input class="setting-input" id="vboxSmooth" type="number" value="3" min="1" max="20">
+  </div>
+  <div class="setting-item">
+    <div class="setting-label">Sub-Env Period</div>
+    <input class="setting-input" id="subEnvPeriod" type="number" value="14" min="2" max="100">
+  </div>
+  <div class="setting-item">
+    <div class="setting-label">Sub-Env Dev (%)</div>
+    <input class="setting-input" id="subEnvDev" type="number" value="20" min="1" max="100">
+  </div>
+  <div class="setting-item">
+    <div class="setting-label">High Level</div>
+    <input class="setting-input" id="highLevel" type="number" value="85" min="50" max="99">
+  </div>
+  <div class="setting-item">
+    <div class="setting-label">Low Level</div>
+    <input class="setting-input" id="lowLevel" type="number" value="15" min="1" max="50">
+  </div>
+  <div class="setting-item full-width">
+    <button class="refresh-btn" onclick="refreshData()">🔄 Refresh &amp; Hitung Ulang</button>
+  </div>
+</div>
+
+<footer>FX Signal Analyzer · Twelve Data API · GBP/USD &amp; EUR/USD · ©2025</footer>
+
+<script>
+// ─────────── CONFIG ───────────
+const API_KEY = '8cd5e84fa4564322b907aaddac29b059';
+const BASE_URL = 'https://api.twelvedata.com';
+
+let currentPair = 'GBP/USD';
+let currentTF   = '15min';
+let rawBars     = [];
+let autoRefreshTimer = null;
+
+// ─────────── PAIR / TF SELECTORS ───────────
+function selectPair(pair, el) {
+  currentPair = pair;
+  document.querySelectorAll('.pair-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('pairLabel').textContent = pair;
+  refreshData();
+}
+function selectTF(tf, el) {
+  currentTF = tf;
+  document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  refreshData();
+}
+
+// ─────────── FETCH DATA ───────────
+async function fetchOHLC() {
+  const symbol = currentPair.replace('/', '');
+  const url = `${BASE_URL}/time_series?symbol=${currentPair}&interval=${currentTF}&outputsize=120&apikey=${API_KEY}&format=JSON`;
+  const res  = await fetch(url);
+  const json = await res.json();
+  if (json.status === 'error') throw new Error(json.message);
+  return json.values.reverse(); // oldest first
+}
+
+// ─────────── INDICATOR CALCULATIONS ───────────
+function calcSMA(arr, period) {
+  const out = new Array(arr.length).fill(null);
+  for (let i = period - 1; i < arr.length; i++) {
+    let s = 0;
+    for (let k = 0; k < period; k++) s += arr[i - k];
+    out[i] = s / period;
+  }
+  return out;
+}
+
+function calcEnvelopes(closes, period, devPct) {
+  const ma  = calcSMA(closes, period);
+  const upper = ma.map(v => v != null ? v * (1 + devPct / 100) : null);
+  const lower = ma.map(v => v != null ? v * (1 - devPct / 100) : null);
+  return { ma, upper, lower };
+}
+
+function calcVBox(bars, lookback, smooth) {
+  const n   = bars.length;
+  const raw = new Array(n).fill(null);
+  for (let i = lookback - 1; i < n; i++) {
+    let hi = -Infinity, lo = Infinity;
+    for (let k = 0; k < lookback; k++) {
+      hi = Math.max(hi, parseFloat(bars[i - k].high));
+      lo = Math.min(lo, parseFloat(bars[i - k].low));
+    }
+    const range = hi - lo;
+    const close = parseFloat(bars[i].close);
+    raw[i] = range > 0 ? Math.min(100, Math.max(0, (close - lo) / range * 100)) : 50;
+  }
+  // smooth
+  const smoothed = new Array(n).fill(null);
+  for (let i = lookback - 1; i < n; i++) {
+    let s = 0, cnt = 0;
+    for (let k = 0; k < smooth; k++) {
+      if (raw[i - k] != null) { s += raw[i - k]; cnt++; }
+    }
+    smoothed[i] = cnt > 0 ? s / cnt : null;
+  }
+  return smoothed;
+}
+
+function calcSubEnvelopes(vboxVals, period, devPct) {
+  const valid = vboxVals.map(v => v != null ? v : null);
+  const ma    = new Array(vboxVals.length).fill(null);
+  for (let i = period - 1; i < vboxVals.length; i++) {
+    let s = 0, cnt = 0;
+    for (let k = 0; k < period; k++) {
+      if (valid[i - k] != null) { s += valid[i - k]; cnt++; }
+    }
+    ma[i] = cnt > 0 ? s / cnt : null;
+  }
+  const upper = ma.map(v => v != null ? Math.min(100, v * (1 + devPct / 100)) : null);
+  const lower = ma.map(v => v != null ? Math.max(0, v * (1 - devPct / 100)) : null);
+  return { upper, lower };
+}
+
+// ─────────── SIGNAL LOGIC ───────────
+function computeSignal(vbox, subUpper, subLower, highLvl, lowLvl) {
+  const last = vbox.length - 1;
+  const v = vbox[last];
+  const su = subUpper[last];
+  const sl = subLower[last];
+  if (v == null) return 'neutral';
+  const isBuy  = v <= lowLvl  && (sl == null || v <= sl);
+  const isSell = v >= highLvl && (su == null || v >= su);
+  if (isBuy)  return 'buy';
+  if (isSell) return 'sell';
+  return 'neutral';
+}
+
+// ─────────── CANVAS DRAWING UTILITIES ───────────
+function clearCanvas(canvas) {
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function setCanvasSize(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const w   = canvas.parentElement.clientWidth;
+  canvas.width  = w * dpr;
+  canvas.style.width  = w + 'px';
+  canvas.height = parseInt(canvas.getAttribute('height')) * dpr;
+  canvas.style.height = canvas.getAttribute('height') + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx, w, h: parseInt(canvas.getAttribute('height')) };
+}
+
+// ─────────── DRAW MAIN CHART ───────────
+function drawMainChart(bars, ma, upper, lower) {
+  const canvas = document.getElementById('mainChart');
+  const { ctx, w, h } = setCanvasSize(canvas);
+
+  const pad = { t: 16, b: 24, l: 8, r: 56 };
+  const cw  = w - pad.l - pad.r;
+  const ch  = h - pad.t - pad.b;
+
+  const n = bars.length;
+  const sliceN = Math.min(n, 80);
+  const start  = n - sliceN;
+
+  // price range
+  let prMin = Infinity, prMax = -Infinity;
+  for (let i = start; i < n; i++) {
+    prMin = Math.min(prMin, parseFloat(bars[i].low));
+    prMax = Math.max(prMax, parseFloat(bars[i].high));
+  }
+  // include envelopes in range
+  for (let i = start; i < n; i++) {
+    if (upper[i] != null) { prMin = Math.min(prMin, upper[i]); prMax = Math.max(prMax, upper[i]); }
+    if (lower[i] != null) { prMin = Math.min(prMin, lower[i]); prMax = Math.max(prMax, lower[i]); }
+  }
+  const prRange = prMax - prMin || 1;
+  const py = v => pad.t + ch - (v - prMin) / prRange * ch;
+
+  const barW  = cw / sliceN;
+  const bw    = Math.max(1, barW * 0.6);
+
+  // ── background: Histogram fill (purple-ish boxes from low downward)
+  for (let i = 0; i < sliceN; i++) {
+    const bi  = start + i;
+    const bar = bars[bi];
+    const x   = pad.l + i * barW + barW / 2;
+    const lowY = py(parseFloat(bar.low));
+    const botY = py(prMin);
+    ctx.fillStyle = 'rgba(180,80,255,0.18)';
+    ctx.fillRect(pad.l + i * barW, lowY, barW, botY - lowY);
+  }
+
+  // ── Envelopes
+  const drawLine = (arr, color, dash = []) => {
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash(dash);
+    let first = true;
+    for (let i = 0; i < sliceN; i++) {
+      const bi = start + i;
+      if (arr[bi] == null) { first = true; continue; }
+      const x = pad.l + i * barW + barW / 2;
+      const y = py(arr[bi]);
+      if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+
+  drawLine(upper, '#ff4444');
+  drawLine(lower, '#44ff88');
+  drawLine(ma,    '#ffffff');
+
+  // ── Candlesticks
+  for (let i = 0; i < sliceN; i++) {
+    const bi   = start + i;
+    const bar  = bars[bi];
+    const o    = parseFloat(bar.open), c = parseFloat(bar.close);
+    const h_   = parseFloat(bar.high), l_ = parseFloat(bar.low);
+    const bull = c >= o;
+    const x    = pad.l + i * barW + barW / 2;
+    const color = bull ? '#00e5ff' : '#ff2d78';
+
+    // wick
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, py(h_));
+    ctx.lineTo(x, py(l_));
+    ctx.stroke();
+
+    // body
+    const y1 = py(Math.max(o, c));
+    const y2 = py(Math.min(o, c));
+    ctx.fillStyle = bull ? 'rgba(0,229,255,0.85)' : 'rgba(255,45,120,0.85)';
+    ctx.fillRect(x - bw / 2, y1, bw, Math.max(1, y2 - y1));
+  }
+
+  // ── Price axis
+  ctx.fillStyle = '#4a5280';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'left';
+  const steps = 4;
+  for (let s = 0; s <= steps; s++) {
+    const v = prMin + prRange * (s / steps);
+    const y = py(v);
+    ctx.fillStyle = '#1e2440';
+    ctx.fillRect(pad.l, y, cw, 0.5);
+    ctx.fillStyle = '#4a5280';
+    ctx.fillText(v.toFixed(5), w - pad.r + 2, y + 3);
+  }
+}
+
+// ─────────── DRAW SUB CHART ───────────
+function drawSubChart(bars, vbox, subUpper, subLower, highLvl, lowLvl) {
+  const canvas = document.getElementById('subChart');
+  const { ctx, w, h } = setCanvasSize(canvas);
+
+  const pad   = { t: 8, b: 20, l: 8, r: 36 };
+  const cw    = w - pad.l - pad.r;
+  const ch    = h - pad.t - pad.b;
+  const n     = vbox.length;
+  const sliceN = Math.min(n, 80);
+  const start  = n - sliceN;
+  const barW   = cw / sliceN;
+
+  const sy = v => pad.t + ch - (v / 100) * ch;
+
+  // ── horizontal grid
+  ctx.fillStyle = '#1a1e30';
+  [0, 15, 50, 85, 100].forEach(lv => {
+    const y = sy(lv);
+    ctx.fillRect(pad.l, y, cw, 0.5);
+  });
+
+  // ── Histogram bars
+  for (let i = 0; i < sliceN; i++) {
+    const bi = start + i;
+    if (vbox[bi] == null) continue;
+    const bar   = bars[bi];
+    const bull  = parseFloat(bar.close) >= parseFloat(bar.open);
+    const v     = vbox[bi];
+    const x     = pad.l + i * barW;
+    const bW    = Math.max(1, barW - 1);
+    const y0    = sy(0);
+    const yv    = sy(v);
+    ctx.fillStyle = bull ? 'rgba(0,229,255,0.85)' : 'rgba(255,45,120,0.85)';
+    ctx.fillRect(x, yv, bW, y0 - yv);
+  }
+
+  // ── Envelope lines in sub-window
+  const drawDot = (arr, color) => {
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 1.2;
+    ctx.setLineDash([4, 3]);
+    let first = true;
+    for (let i = 0; i < sliceN; i++) {
+      const bi = start + i;
+      if (arr[bi] == null) { first = true; continue; }
+      const x = pad.l + i * barW + barW / 2;
+      const y = sy(arr[bi]);
+      if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+  drawDot(subUpper, '#44ff88');
+  drawDot(subLower, '#ff4444');
+
+  // ── Ref level lines
+  const drawLevel = (lv, color, label) => {
+    const y = sy(lv);
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 0.8;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + cw, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, w - pad.r + 2, y + 3);
+  };
+  drawLevel(highLvl, '#ffd700', highLvl);
+  drawLevel(lowLvl,  '#00ffff', lowLvl);
+
+  // ── Arrows
+  for (let i = 0; i < sliceN; i++) {
+    const bi = start + i;
+    if (vbox[bi] == null) continue;
+    const v  = vbox[bi];
+    const su = subUpper[bi], sl = subLower[bi];
+    const isBuy  = v <= lowLvl  && (sl == null || v <= sl);
+    const isSell = v >= highLvl && (su == null || v >= su);
+    const x  = pad.l + i * barW + barW / 2;
+    if (isBuy) {
+      ctx.fillStyle = '#00ff99';
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('▲', x, sy(lowLvl) - 3);
+    }
+    if (isSell) {
+      ctx.fillStyle = '#ff6600';
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('▼', x, sy(highLvl) + 12);
+    }
+  }
+
+  // ── Value axis
+  ctx.fillStyle = '#4a5280';
+  ctx.font = '8px monospace';
+  ctx.textAlign = 'left';
+  [0, 50, 100].forEach(lv => {
+    ctx.fillText(lv, w - pad.r + 2, sy(lv) + 3);
+  });
+}
+
+// ─────────── REFRESH DATA & RENDER ───────────
+async function refreshData() {
+  document.getElementById('loadingOverlay').style.display = 'flex';
+  document.getElementById('errorMsg').style.display = 'none';
+
+  try {
+    const bars = await fetchOHLC();
+    rawBars    = bars;
+    if (!bars || bars.length < 20) throw new Error('Data tidak cukup dari API');
+
+    const closes = bars.map(b => parseFloat(b.close));
+    const period  = parseInt(document.getElementById('envPeriod').value) || 14;
+    const devPct  = parseFloat(document.getElementById('envDev').value)  || 0.10;
+    const lookback = parseInt(document.getElementById('vboxLook').value)   || 14;
+    const smooth   = parseInt(document.getElementById('vboxSmooth').value) || 3;
+    const sePeriod = parseInt(document.getElementById('subEnvPeriod').value) || 14;
+    const seDev    = parseFloat(document.getElementById('subEnvDev').value)  || 20;
+    const highLvl  = parseFloat(document.getElementById('highLevel').value)  || 85;
+    const lowLvl   = parseFloat(document.getElementById('lowLevel').value)   || 15;
+
+    // Envelope on price
+    const { ma, upper, lower } = calcEnvelopes(closes, period, devPct);
+
+    // VBox
+    const vbox = calcVBox(bars, lookback, smooth);
+
+    // Sub-window envelopes on VBox
+    const { upper: subU, lower: subL } = calcSubEnvelopes(vbox, sePeriod, seDev);
+
+    // Draw
+    drawMainChart(bars, ma, upper, lower);
+    drawSubChart(bars, vbox, subU, subL, highLvl, lowLvl);
+
+    // Signal
+    const signal = computeSignal(vbox, subU, subL, highLvl, lowLvl);
+    const banner = document.getElementById('signalBanner');
+    const sigTxt = document.getElementById('signalText');
+    banner.className = 'signal-banner ' + signal;
+    if (signal === 'buy') {
+      sigTxt.textContent = '▲ BUY SIGNAL — VBox di zona oversold (≤' + lowLvl + ')';
+      banner.querySelector('.signal-icon').textContent = '▲';
+    } else if (signal === 'sell') {
+      sigTxt.textContent = '▼ SELL SIGNAL — VBox di zona overbought (≥' + highLvl + ')';
+      banner.querySelector('.signal-icon').textContent = '▼';
+    } else {
+      sigTxt.textContent = '— NEUTRAL — Belum ada sinyal konfirmasi';
+      banner.querySelector('.signal-icon').textContent = '⏳';
+    }
+
+    // Price ticker
+    const last    = bars[bars.length - 1];
+    const prev    = bars[bars.length - 2];
+    const lClose  = parseFloat(last.close);
+    const pClose  = parseFloat(prev.close);
+    const diff    = lClose - pClose;
+    document.getElementById('priceDisplay').textContent = lClose.toFixed(5);
+    const chEl = document.getElementById('priceChange');
+    chEl.textContent = (diff >= 0 ? '+' : '') + diff.toFixed(5);
+    chEl.className = 'price-change ' + (diff >= 0 ? 'up' : 'down');
+    document.getElementById('spreadInfo').textContent =
+      'H: ' + parseFloat(last.high).toFixed(5) + ' | L: ' + parseFloat(last.low).toFixed(5);
+
+    // Stats
+    const lastIdx = vbox.length - 1;
+    const vVal = vbox[lastIdx];
+    document.getElementById('statVBox').textContent  = vVal != null ? vVal.toFixed(1) : '--';
+    document.getElementById('statEnvU').textContent  = subU[lastIdx] != null ? subU[lastIdx].toFixed(1) : '--';
+    document.getElementById('statEnvL').textContent  = subL[lastIdx] != null ? subL[lastIdx].toFixed(1) : '--';
+    if (vVal != null) {
+      document.getElementById('statVBox').style.color =
+        vVal >= highLvl ? 'var(--bear)' : vVal <= lowLvl ? 'var(--buy-signal)' : 'var(--bull)';
+    }
+
+    // Labels
+    document.getElementById('mainChartInfo').textContent = `Period: ${period} | Dev: ${devPct}%`;
+    document.getElementById('subChartInfo').textContent  = `Look: ${lookback} | Env: ${sePeriod}/${seDev}%`;
+
+    // Timestamp
+    const now = new Date();
+    document.getElementById('lastUpdate').textContent =
+      now.getHours().toString().padStart(2,'0') + ':' +
+      now.getMinutes().toString().padStart(2,'0') + ':' +
+      now.getSeconds().toString().padStart(2,'0');
+
+    document.getElementById('apiStatus').textContent = '✓ Twelve Data';
+
+  } catch (err) {
+    const em = document.getElementById('errorMsg');
+    em.style.display = 'block';
+    em.textContent   = '⚠ Error: ' + err.message;
+    console.error(err);
+  } finally {
+    document.getElementById('loadingOverlay').style.display = 'none';
+  }
+}
+
+// ─────────── AUTO REFRESH ───────────
+function startAutoRefresh() {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(() => refreshData(), 30000); // 30s
+}
+
+// ─────────── RESIZE HANDLER ───────────
+window.addEventListener('resize', () => {
+  if (rawBars.length > 0) {
+    const closes = rawBars.map(b => parseFloat(b.close));
+    const period  = parseInt(document.getElementById('envPeriod').value) || 14;
+    const devPct  = parseFloat(document.getElementById('envDev').value)  || 0.10;
+    const lookback = parseInt(document.getElementById('vboxLook').value)   || 14;
+    const smooth   = parseInt(document.getElementById('vboxSmooth').value) || 3;
+    const sePeriod = parseInt(document.getElementById('subEnvPeriod').value) || 14;
+    const seDev    = parseFloat(document.getElementById('subEnvDev').value)  || 20;
+    const highLvl  = parseFloat(document.getElementById('highLevel').value)  || 85;
+    const lowLvl   = parseFloat(document.getElementById('lowLevel').value)   || 15;
+    const { ma, upper, lower } = calcEnvelopes(closes, period, devPct);
+    const vbox = calcVBox(rawBars, lookback, smooth);
+    const { upper: subU, lower: subL } = calcSubEnvelopes(vbox, sePeriod, seDev);
+    drawMainChart(rawBars, ma, upper, lower);
+    drawSubChart(rawBars, vbox, subU, subL, highLvl, lowLvl);
+  }
+});
+
+// ─────────── INIT ───────────
+window.onload = () => {
+  refreshData();
+  startAutoRefresh();
+};
+</script>
+</body>
+</html>
